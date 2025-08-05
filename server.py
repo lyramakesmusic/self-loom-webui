@@ -251,7 +251,7 @@ def get_grader_choice_with_retry(context, completions, max_retries=10, model=INS
     for i, completion in enumerate(completions, 1):
         options_text += f"{i}. {completion}\n\n"
     
-    prompt = f"{context}\n\n{options_text}\n\nWhich of the following 5 completions of the given text is more interesting? reply with only a single number - 1, 2, 3, 4, 5. You should pick whichever completion is the most absolutely batshit insane, weird, or interesting. You're looking for the most *interesting* one."
+    prompt = f"{context}\n\n{options_text}\n\nWhich of the following 5 completions of the given text is more interesting? reply with only a single number - 1, 2, 3, 4, 5. Remember, you're looking for the most *interesting* one."
     
     payload = {
         "model": model,
