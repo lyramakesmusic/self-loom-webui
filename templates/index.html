@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Self-Loom Text Generator</title>
+    
+    <style>
+        :root {
+            --bg-primary: #141516;
+            --bg-secondary: #202224;
+            --text-primary: #d4d1cb;
+            --text-secondary: #aca59a;
+            --border-color: #333333;
+            --hover-bg: #262a2b;
+            --active-bg: #153e72;
+            --active-text: #4faeff;
+            --btn-blue: #0d6efd;
+        }
+
+        body.light-mode {
+            --bg-primary: #fff;
+            --bg-secondary: #f8f9fa;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --border-color: #dee2e6;
+            --hover-bg: #e9ecef;
+            --active-bg: #cfe2ff;
+            --active-text: #0d6efd;
+            --btn-blue: #0d6efd;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+        }
+
+        /* Document Sidebar */
+        .document-sidebar {
+            width: 280px;
+            background-color: var(--bg-secondary);
+            border-right: 2px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            left: -280px;
+            top: 0;
+            height: 100vh;
+            z-index: 100;
+            transition: left 0.3s ease;
+        }
+
+        .document-sidebar.visible {
+            left: 0;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--bg-secondary);
+        }
+
+        .sidebar-header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+        
+        .document-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .current-document {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .current-document label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .current-document input {
+            width: 100%;
+            padding: 8px;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .document-list {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .document-list h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .document-item {
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .document-item:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .document-item.active {
+            background-color: var(--active-bg);
+            border-color: var(--active-text);
+        }
+
+        .document-name {
+            font-size: 14px;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .document-date {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .document-item.active .document-date {
+            color: var(--active-text);
+        }
+        
+        .document-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .document-actions {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .document-item:hover .document-actions {
+            opacity: 1;
+        }
+        
+        .document-actions:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-primary);
+        }
+        
+        .document-menu {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 4px 0;
+            min-width: 120px;
+        }
+        
+        .menu-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+        
+        .menu-item:hover {
+            background-color: var(--hover-bg);
+        }
+        
+        .menu-item.delete {
+            color: #dc3545;
+        }
+        
+        .menu-item.delete:hover {
+            background-color: #dc354520;
+        }
+
+        .btn-small {
+            background-color: var(--btn-blue);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: opacity 0.3s ease;
+        }
+
+        .btn-small:hover {
+            opacity: 0.8;
+        }
+
+        .left-panel {
+            width: 50%;
+            background-color: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-width: 200px;
+            transition: margin-left 0.3s ease;
+        }
+
+        .left-panel.sidebar-open {
+            margin-left: 280px;
+        }
+
+        .left-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--bg-primary);
+            position: relative;
+        }
+
+        .left-header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+            margin-left: 35px;
+        }
+
+        .left-header .status {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .toggle-sidebar {
+            position: absolute;
+            top: 25px;
+            left: 20px;
+            width: 24px;
+            height: 24px;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            z-index: 10;
+        }
+
+        .toggle-sidebar:hover {
+            color: var(--active-text);
+        }
+
+        .divider {
+            width: 4px;
+            background-color: var(--border-color);
+            cursor: ew-resize;
+            position: relative;
+            transition: background-color 0.2s ease;
+        }
+
+        .divider:hover {
+            background-color: var(--active-text);
+        }
+
+        .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 40px;
+            margin-left: -10px;
+            background: transparent;
+        }
+
+
+
+        .full-text-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: var(--bg-primary);
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .full-text {
+            line-height: 1.6;
+            font-size: 16px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-width: 760px;
+            width: 100%;
+            outline: none;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .right-panel {
+            flex: 1;
+            background-color: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-width: 200px;
+        }
+
+        .right-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--bg-secondary);
+        }
+
+        .right-header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        .iteration-info {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .completions-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: var(--bg-secondary);
+        }
+
+        .completion-option {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-primary);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .completion-option.generating {
+            border-color: var(--text-secondary);
+            background-color: var(--hover-bg);
+        }
+
+        .completion-option.chosen {
+            background-color: var(--active-bg);
+            border-color: var(--active-text);
+            box-shadow: 0 0 15px rgba(79, 174, 255, 0.5);
+        }
+
+        .completion-option.chosen::before {
+            content: "✓ CHOSEN";
+            position: absolute;
+            top: -10px;
+            right: 10px;
+            background-color: var(--active-text);
+            color: var(--bg-primary);
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+
+        .completion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .completion-number {
+            font-weight: bold;
+            color: var(--active-text);
+            font-size: 14px;
+        }
+
+        .completion-status {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .completion-text {
+            line-height: 1.5;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-height: 40px;
+        }
+
+        .loading-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            border-top-color: var(--active-text);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            border-radius: 8px;
+            border: 2px solid var(--btn-blue);
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+            position: relative;
+            min-width: 90px;
+            font-weight: 500;
+        }
+        
+        .btn:hover {
+            background-color: var(--active-bg);
+        }
+        
+        .btn-start,
+        .btn-stop {
+            border-color: var(--btn-blue);
+        }
+        
+        .btn-stop {
+            border-color: #dc3545;
+            color: #dc3545;
+        }
+        
+        .btn-stop:hover {
+            background-color: rgba(220, 53, 69, 0.1);
+        }
+
+
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .theme-btn {
+            margin-right: 10px;
+            min-width: 40px;
+            font-size: 12px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        .error {
+            background-color: #ff4444;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        /* User is dragging */
+        .container.resizing {
+            cursor: ew-resize;
+            user-select: none;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            max-width: 300px;
+        }
+
+        .notification-content {
+            text-align: center;
+        }
+
+        .notification .btn-small {
+            margin: 5px;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            min-width: 400px;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-body p {
+            margin: 0 0 15px 0;
+            color: var(--text-secondary);
+        }
+
+        .rename-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 16px;
+        }
+
+        .rename-input:focus {
+            outline: none;
+            border-color: var(--btn-blue);
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .container.resizing .divider {
+            background-color: var(--active-text);
+        }
+
+        /* Settings Form Styles */
+        .settings-form {
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        
+        .settings-form .form-label {
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .settings-form .form-range {
+            margin-top: 8px;
+            width: 100%;
+        }
+        
+        .settings-form .form-text {
+            margin-top: 5px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        
+        .settings-form .value-display {
+            font-size: 12px;
+            font-weight: normal;
+            background: transparent;
+            border: 1px solid transparent;
+            padding: 2px 6px;
+            border-radius: 4px;
+            width: 60px;
+            text-align: right;
+            transition: all 0.2s ease;
+            cursor: text;
+            -moz-appearance: textfield; /* Firefox */
+            appearance: textfield;
+        }
+        
+        /* Remove spin buttons from number inputs */
+        .settings-form .value-display::-webkit-outer-spin-button,
+        .settings-form .value-display::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .settings-form .value-display:focus {
+            outline: none;
+            border-color: var(--btn-blue);
+            background-color: var(--bg-primary);
+        }
+        
+        /* Settings form value display for default dark mode */
+        .settings-form .value-display {
+            color: var(--active-text);
+        }
+        
+        .settings-form .value-display:hover {
+            background-color: rgba(77, 159, 255, 0.1);
+        }
+        
+        /* Light mode overrides for settings form */
+        body.light-mode .settings-form .value-display {
+            color: var(--btn-blue);
+        }
+        
+        body.light-mode .settings-form .value-display:hover {
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+        
+        /* .settings-form .mb-4 {
+            margin-bottom: 1.25rem !important;
+        } */
+
+        .settings-form .form-control {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 14px;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+
+        .settings-form .form-control:focus {
+            outline: none;
+            border-color: var(--btn-blue);
+            background-color: var(--bg-primary);
+        }
+
+        .settings-form .form-control:disabled {
+            background-color: var(--bg-primary);
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+
+        /* Custom Accordion styling (no Bootstrap) */
+        .accordion {
+            background-color: transparent;
+        }
+        
+        .accordion-item {
+            background-color: var(--bg-primary);
+            /* border: 1px solid var(--border-color); */
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .accordion-button {
+            width: 100%;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            border: none;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-radius: 6px 6px 0 0;
+            transition: background-color 0.2s ease;
+        }
+        
+        .accordion-button:hover {
+            background-color: var(--hover-bg);
+        }
+        
+        .accordion-button:not(.collapsed) {
+            background-color: var(--hover-bg);
+            border-radius: 6px 6px 0 0;
+        }
+        
+        .accordion-button.collapsed + .accordion-collapse {
+            border-radius: 0 0 6px 6px;
+        }
+        
+        .accordion-button:focus {
+            outline: none;
+            box-shadow: none;
+        }
+        
+        .gear-icon {
+            margin-right: 8px;
+            font-size: 14px;
+        }
+        
+        .accordion-arrow {
+            font-size: 12px;
+            transition: transform 0.2s ease;
+        }
+        
+        .accordion-button:not(.collapsed) .accordion-arrow {
+            transform: rotate(180deg);
+        }
+        
+        .accordion-collapse {
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .accordion-collapse.collapsed {
+            max-height: 0;
+        }
+        
+        .accordion-collapse:not(.collapsed) {
+            max-height: 500px;
+        }
+        
+        .accordion-body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 0.75rem;
+            /* border-top: 1px solid var(--border-color); */
+        }
+
+        /* Custom spacing classes (replacing Bootstrap) */
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 1000px) {
+            /* Force full screen layout with viewport fixes */
+            html, body {
+                height: 100vh;
+                width: 100vw;
+                overflow: hidden;
+                margin: 0;
+                padding: 0;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+            }
+            
+            /* Force viewport to stay in place */
+            @supports (-webkit-touch-callout: none) {
+                html, body {
+                    height: -webkit-fill-available;
+                    min-height: -webkit-fill-available;
+                }
+            }
+
+            .container {
+                flex-direction: column;
+                height: 100vh;
+                height: calc(var(--vh, 1vh) * 100);
+                width: 100vw;
+                overflow: hidden;
+            }
+
+            /* Document sidebar - slide in from left */
+            .document-sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: 300px;
+                transform: translateX(-100%);
+                z-index: 1050;
+                transition: transform 0.3s ease;
+                margin-left: 0;
+            }
+            
+            .document-sidebar.visible {
+                transform: translateX(0);
+            }
+
+            /* Left panel - top section on mobile */
+            .left-panel {
+                width: 100vw;
+                height: 60vh;
+                height: calc(var(--vh, 1vh) * 60);
+                margin-left: 0 !important;
+                position: relative;
+                z-index: 1;
+                min-width: 100vw;
+                max-width: 100vw;
+                flex-shrink: 0;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                box-sizing: border-box;
+            }
+            
+            .left-panel.sidebar-open {
+                margin-left: 0 !important;
+                width: 100vw;
+            }
+
+            /* Right panel - bottom section on mobile */
+            .right-panel {
+                width: 100vw;
+                height: 40vh;
+                height: calc(var(--vh, 1vh) * 40);
+                position: relative;
+                z-index: 1;
+                min-width: 100vw;
+                max-width: 100vw;
+                flex-shrink: 0;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                box-sizing: border-box;
+            }
+            
+            /* Hide completion options header on mobile */
+            .right-header h1 {
+                display: none;
+            }
+            
+            .right-header {
+                padding: 10px 20px;
+                min-height: 40px;
+            }
+
+            /* Mobile divider - horizontal instead of vertical */
+            .divider {
+                display: block;
+                width: 100%;
+                height: 8px;
+                background-color: var(--border-color);
+                cursor: ns-resize;
+                position: relative;
+                transition: background-color 0.2s ease;
+                z-index: 10;
+            }
+
+            .divider:hover {
+                background-color: var(--active-text);
+            }
+
+            .divider::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 60px;
+                height: 6px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 3px;
+            }
+
+            .container.resizing .divider {
+                background-color: var(--active-text);
+            }
+
+            /* Ensure full width for content areas - scrollable */
+            .full-text-container {
+                width: 100%;
+                max-width: 100%;
+                margin: 0;
+                padding: 15px;
+                flex: 1;
+                overflow-y: auto;
+                overflow-x: hidden;
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+
+            .full-text {
+                font-size: 14px;
+            }
+
+            .completions-container {
+                width: 100%;
+                max-width: 100%;
+                padding: 15px;
+                flex: 1;
+                overflow-y: auto;
+                overflow-x: hidden;
+                font-size: 12px;
+            }
+
+            /* Backdrop for sidebar overlay */
+            .sidebar-backdrop {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 1045;
+            }
+
+            .sidebar-backdrop.show {
+                display: block;
+            }
+
+            /* Prevent body scroll when sidebar is open */
+            body.sidebar-open {
+                overflow: hidden;
+            }
+            
+            /* Mobile header adjustments - fixed headers */
+            .left-header {
+                position: sticky;
+                top: 0;
+                background-color: var(--bg-secondary);
+                border-bottom: 1px solid var(--border-color);
+                padding: 15px;
+                z-index: 10;
+                flex-shrink: 0;
+            }
+            
+            .left-header h1 {
+                font-size: 18px;
+                margin-bottom: 5px;
+            }
+            
+            .left-header .status {
+                font-size: 12px;
+            }
+            
+            .right-header {
+                position: sticky;
+                top: 0;
+                background-color: var(--bg-secondary);
+                border-bottom: 1px solid var(--border-color);
+                padding: 10px 20px;
+                min-height: 40px;
+                z-index: 10;
+                flex-shrink: 0;
+            }
+            
+            .right-header h1 {
+                font-size: 16px;
+                margin-bottom: 5px;
+            }
+            
+            .iteration-info {
+                font-size: 12px;
+            }
+
+            /* Mobile button adjustments */
+            .btn {
+                padding: 6px 12px;
+                font-size: 14px;
+                min-width: 70px;
+            }
+            
+            .controls {
+                gap: 8px;
+            }
+            
+            /* Touch-friendly buttons */
+            .toggle-sidebar {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+                top: 5px;
+                left: 10px;
+            }
+            
+            /* Smaller sidebar on very small screens */
+            @media (max-width: 600px) {
+                .document-sidebar {
+                    width: 280px;
+                }
+                
+                .toggle-sidebar {
+                    width: 36px;
+                    height: 36px;
+                    font-size: 16px;
+                    top: 5px;
+                    left: 10px;
+                }
+                
+                .left-panel {
+                    height: 65vh;
+                }
+                
+                .right-panel {
+                    height: 35vh;
+                }
+
+                .full-text-container {
+                    padding: 10px;
+                    font-size: 12px;
+                }
+
+                .completions-container {
+                    padding: 10px;
+                    font-size: 12px;
+                }
+                
+                /* Even smaller text and buttons on small phones */
+                .left-header h1 {
+                    font-size: 16px;
+                }
+                
+                .left-header {
+                    padding: 12px;
+                }
+                
+                .btn {
+                    padding: 5px 10px;
+                    font-size: 13px;
+                    min-width: 60px;
+                }
+                
+                .controls {
+                    gap: 6px;
+                }
+                
+                .right-header {
+                    padding: 8px 15px;
+                    min-height: 35px;
+                    position: sticky;
+                    top: 0;
+                    background-color: var(--bg-secondary);
+                    border-bottom: 1px solid var(--border-color);
+                    z-index: 10;
+                    flex-shrink: 0;
+                }
+                
+                /* Smaller text for completion options on mobile */
+                .completion-text {
+                    font-size: 12px;
+                }
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Token Required Modal - Shows immediately if no token -->
+    {% if not token_set %}
+    <div id="tokenModal" style="display: block; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.8);">
+        <div style="background-color: var(--bg-secondary); margin: 10% auto; padding: 30px; border: 2px solid var(--border-color); width: 90%; max-width: 500px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+            <div style="text-align: center; margin-bottom: 25px;">
+                <h2 style="margin: 0 0 15px 0; color: var(--text-primary); font-size: 24px;">Welcome to Self-Loom!</h2>
+                <p style="color: var(--text-secondary); margin: 0; font-size: 16px; line-height: 1.5;">To get started, you need to set your OpenRouter API token. This is required for the AI text generation to work.</p>
+            </div>
+            <form id="token-form">
+                <div style="margin-bottom: 20px;">
+                    <label for="token-input" style="display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 500;">OpenRouter API Token</label>
+                    <input type="password" id="token-input" required placeholder="sk-or-v1-..." style="width: 100%; padding: 12px; border: 2px solid var(--border-color); border-radius: 6px; background-color: var(--bg-primary); color: var(--text-primary); font-size: 14px;">
+                    <div style="font-size: 13px; color: var(--text-secondary); margin-top: 8px; line-height: 1.4;">
+                        <strong>How to get your token:</strong><br>
+                        1. Go to <a href="https://openrouter.ai/settings/keys" target="_blank" style="color: var(--active-text);">https://openrouter.ai/settings/keys</a><br>
+                        2. Create a new API key<br>
+                        3. Copy and paste it here
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    <button type="submit" style="padding: 12px 24px; border: none; background-color: var(--btn-blue); color: white; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 500; min-width: 120px;">Save Token & Continue</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="container" id="container">
+        <!-- Document Sidebar -->
+        <div class="document-sidebar" id="documentSidebar">
+            <div class="sidebar-header">
+                <h1>Documents</h1>
+                <div class="document-subtitle">Autosaves on edit</div>
+            </div>
+            
+            <!-- Settings Accordion -->
+            <div>
+                <div class="accordion" id="settingsAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="settingsHeading">
+                            <button class="accordion-button collapsed" type="button" onclick="toggleSettingsAccordion()">
+                                <span class="gear-icon">⚙</span>Generation Settings
+                                <span class="accordion-arrow">▼</span>
+                            </button>
+                        </h2>
+                        <div id="settingsCollapse" class="accordion-collapse collapsed">
+                            <div class="accordion-body">
+                                <div class="settings-form">
+                                    <div class="mb-4">
+                                        <label for="base-model" class="form-label">Base Model</label>
+                                        <input type="text" class="form-control" id="base-model" value="z-ai/glm-4.5-air:free" placeholder="Base model name">
+                                        <!-- <div class="form-text">Model for text generation</div> -->
+                                    </div>
+                                    
+                                    <div class="mb-4">
+                                        <label for="grader-model" class="form-label">Grader Model</label>
+                                        <input type="text" class="form-control" id="grader-model" value="z-ai/glm-4.5-air:free" placeholder="Grader model name">
+                                        <!-- <div class="form-text">Model for grading completions</div> -->
+                                    </div>
+                                    
+                                    <div class="mb-4">
+                                        <label for="temperature" class="form-label">
+                                            Temperature
+                                            <input type="number" class="value-display" id="temperature-value" value="1.0" min="0" max="2" step="0.01">
+                                        </label>
+                                        <input type="range" class="form-range" id="temperature" name="temperature" min="0" max="2" step="0.01" value="1.0">
+                                        <!-- <div class="form-text">Controls randomness (0-2)</div> -->
+                                    </div>
+                                    
+                                    <div class="mb-4">
+                                        <label for="min_p" class="form-label">
+                                            Min P
+                                            <input type="number" class="value-display" id="min_p-value" value="0.02" min="0" max="0.5" step="0.01">
+                                        </label>
+                                        <input type="range" class="form-range" id="min_p" name="min_p" min="0" max="0.5" step="0.01" value="0.02">
+                                        <!-- <div class="form-text">Filters low-probability tokens</div> -->
+                                    </div>
+                                    
+                                    <div class="mb-4">
+                                        <label for="max_new_tokens" class="form-label">Max New Tokens</label>
+                                        <input type="number" class="form-control" id="max_new_tokens" name="max_new_tokens" min="1" max="2048" value="128" required>
+                                        <!-- <div class="form-text">Maximum tokens to generate per completion</div> -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="document-list">
+                <h4>Recent Documents</h4>
+                <div id="documentItems">
+                    <div class="document-item">
+                        <span>No documents found</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Left panel -->
+        <div class="left-panel" id="leftPanel">
+            <div class="left-header">
+                <button class="toggle-sidebar" id="toggle-sidebar" onclick="toggleDocumentSidebar()">≡</button>
+                <h1>Self-Loom</h1>
+                <div class="status" id="status">Ready...</div>
+            </div>
+            <div class="controls">
+                <button class="btn" onclick="newDocument()">New</button>
+                <button class="btn btn-start" id="toggleBtn" onclick="toggleGeneration()">Start</button>
+            </div>
+            <div class="full-text-container">
+                <div class="full-text" id="fullText" contenteditable="true"></div>
+            </div>
+        </div>
+
+        <!-- Resizable divider -->
+        <div class="divider" id="divider"></div>
+
+        <!-- Right panel -->
+        <div class="right-panel" id="rightPanel">
+            <div class="right-header">
+                <h1>Completion Options</h1>
+                <div class="iteration-info" id="iterationInfo">Iteration: Not started</div>
+            </div>
+            <div class="completions-container" id="completionsContainer">
+                <div style="text-align: center; color: var(--text-secondary); margin-top: 50px;">
+                    <p>Completion options will appear here when generation starts.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar backdrop for mobile -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
