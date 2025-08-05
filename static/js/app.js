@@ -58,7 +58,7 @@ class SelfLoomApp {
         
         // Get current text as seed and make text box read-only
         // Convert <br> tags to newlines to preserve line breaks from contentEditable
-        const seedText = this.fullTextEl.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '') || 'Hello!';
+        const seedText = this.convertHtmlToText(this.fullTextEl.innerHTML) || 'Hello!';
         this.fullTextEl.contentEditable = 'false';
         this.markDocumentModified();
         
@@ -407,7 +407,7 @@ class SelfLoomApp {
              // Save document with new name
              try {
                  // Convert <br> tags back to newlines for saving
-                 const content = this.fullTextEl.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '');
+                 const content = this.convertHtmlToText(this.fullTextEl.innerHTML);
                  const response = await fetch('/api/documents/save', {
                      method: 'POST',
                      headers: { 'Content-Type': 'application/json' },
@@ -469,6 +469,18 @@ class SelfLoomApp {
     
     updateIterationInfo(message) {
         this.iterationInfoEl.textContent = message;
+    }
+    
+    convertHtmlToText(html) {
+        // First convert <br> tags to newlines
+        let text = html.replace(/<br\s*\/?>/gi, '\n');
+        
+        // Create a temporary div to properly extract text content
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = text;
+        
+        // Get text content (this automatically removes HTML tags)
+        return tempDiv.textContent || tempDiv.innerText || '';
     }
     
     scrollToBottom(element) {
@@ -923,7 +935,7 @@ class SelfLoomApp {
          
          try {
              // Convert <br> tags back to newlines for saving
-             const content = this.fullTextEl.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '');
+             const content = this.convertHtmlToText(this.fullTextEl.innerHTML);
              const response = await fetch('/api/documents/save', {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
