@@ -388,15 +388,18 @@ def save_document(name, content):
     """
     try:
         docs_dir = get_documents_dir()
-        filename = os.path.join(docs_dir, f"{name}.txt")
+        base_name = name.strip() or "Untitled"
+        filename = os.path.join(docs_dir, f"{base_name}.txt")
         
+        # Simply overwrite the existing file - this is normal save behavior
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(content)
-        print(f"Saved document: {name}")
-        return True
+        print(f"Saved document: {base_name}")
+        # Return the actual saved name so callers/UI can update
+        return base_name
     except Exception as e:
         print(f"Failed to save document {name}: {e}")
-        return False
+        return None
 
 def load_document(name):
     """
@@ -507,9 +510,9 @@ def api_save_document():
     if not name:
         return jsonify({'error': 'Document name required'}), 400
     
-    success = save_document(name, content)
-    if success:
-        return jsonify({'message': 'Document saved successfully'})
+    saved_name = save_document(name, content)
+    if saved_name:
+        return jsonify({'message': 'Document saved successfully', 'name': saved_name})
     else:
         return jsonify({'error': 'Failed to save document'}), 500
 

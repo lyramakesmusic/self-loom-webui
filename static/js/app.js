@@ -51,15 +51,14 @@ class SelfLoomApp {
     startGeneration() {
         if (this.isGenerating) return;
         
-        console.log('Starting text generation - like opening main valve');
+        console.log('Starting text generation');
         this.isGenerating = true;
         this.updateGenerationButton();
         this.toggleSettingsInputs(false); // Disable settings inputs
         
         // Get current text as seed and make text box read-only
-        // Convert <br> tags to newlines to preserve line breaks from contentEditable
-        const seedText = this.convertHtmlToText(this.fullTextEl.innerHTML) || 'Hello!';
-        this.fullTextEl.contentEditable = 'false';
+        const seedText = this.fullTextEl.value || '';
+        this.fullTextEl.readOnly = true;
         this.markDocumentModified();
         
         this.updateStatus('Connecting...');
@@ -121,7 +120,7 @@ class SelfLoomApp {
         this.updateStatus('Stopped');
         
         // Reset to editable text input but keep the generated content
-        this.fullTextEl.contentEditable = 'true';
+        this.fullTextEl.readOnly = false;
         
         this.completionsContainerEl.innerHTML = `
             <div style="text-align: center; color: var(--text-secondary); margin-top: 50px;">
@@ -187,8 +186,8 @@ class SelfLoomApp {
     
     handleInit(data) {
         this.updateStatus('Generation started with seed text');
-        // Convert newlines to <br> tags for contentEditable display
-        this.fullTextEl.innerHTML = data.text.replace(/\n/g, '<br>');
+        // Set textarea content directly (newlines preserved automatically)
+        this.fullTextEl.value = data.text;
         this.scrollToBottom(this.fullTextContainerEl);
         this.markDocumentModified();
         
@@ -305,8 +304,8 @@ class SelfLoomApp {
     }
     
     handleTextUpdated(data) {
-        // Convert newlines to <br> tags for contentEditable display
-        this.fullTextEl.innerHTML = data.full_text.replace(/\n/g, '<br>');
+        // Set textarea content directly (newlines preserved automatically)
+        this.fullTextEl.value = data.full_text;
         this.scrollToBottom(this.fullTextContainerEl);
         this.updateStatus('Starting next iteration...');
         this.markDocumentModified();
@@ -406,19 +405,20 @@ class SelfLoomApp {
              
              // Save document with new name
              try {
-                 // Convert <br> tags back to newlines for saving
-                 const content = this.convertHtmlToText(this.fullTextEl.innerHTML);
-                 const response = await fetch('/api/documents/save', {
+                 // Get textarea content directly (already plain text with newlines)
+                 const content = this.fullTextEl.value;
+             const response = await fetch('/api/documents/save', {
                      method: 'POST',
                      headers: { 'Content-Type': 'application/json' },
                      body: JSON.stringify({ name: newName, content })
                  });
                  
-                 if (response.ok) {
-                     this.currentDocumentName = newName;
+             if (response.ok) {
+                 const result = await response.json();
+                 this.currentDocumentName = result.name || newName;
                      this.documentModified = false;
                      this.updateDocumentName();
-                     this.updateStatus(`Document renamed to "${newName}"`);
+                 this.updateStatus(`Document renamed to "${this.currentDocumentName}"`);
                      
                      // Optionally delete old document if it had a timestamp name
                      if (oldName.startsWith('Untitled_')) {
@@ -471,17 +471,7 @@ class SelfLoomApp {
         this.iterationInfoEl.textContent = message;
     }
     
-    convertHtmlToText(html) {
-        // First convert <br> tags to newlines
-        let text = html.replace(/<br\s*\/?>/gi, '\n');
-        
-        // Create a temporary div to properly extract text content
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = text;
-        
-        // Get text content (this automatically removes HTML tags)
-        return tempDiv.textContent || tempDiv.innerText || '';
-    }
+
     
     scrollToBottom(element) {
         if (element) {
@@ -722,9 +712,10 @@ class SelfLoomApp {
             }
         }
         
-        this.fullTextEl.contentEditable = 'true';
-        this.fullTextEl.innerHTML = '';
+        this.fullTextEl.readOnly = false;
+        this.fullTextEl.value = '';
         this.currentDocumentName = 'Untitled';
+        this.temporaryDocumentName = null; // Clear any previous temporary name
         this.documentModified = false;
         this.updateDocumentName();
         this.updateStatus('New document created');
@@ -858,10 +849,11 @@ class SelfLoomApp {
             const response = await fetch(`/api/documents/load/${encodeURIComponent(name)}`);
             if (response.ok) {
                 const data = await response.json();
-                this.fullTextEl.contentEditable = 'true';
-                // Convert newlines to <br> tags for contentEditable display
-                this.fullTextEl.innerHTML = data.content.replace(/\n/g, '<br>');
+                this.fullTextEl.readOnly = false;
+                // Set textarea content directly (newlines preserved automatically)
+                this.fullTextEl.value = data.content;
                 this.currentDocumentName = name;
+                this.temporaryDocumentName = null; // Clear any temporary name
                 this.documentModified = false;
                 this.updateDocumentName();
                 this.updateStatus(`Loaded document`);
@@ -894,12 +886,10 @@ class SelfLoomApp {
             this.markDocumentModified();
         });
         
-        // Handle paste events
-        this.fullTextEl.addEventListener('paste', (e) => {
-            e.preventDefault();
-            const text = (e.clipboardData || window.clipboardData).getData('text');
-            document.execCommand('insertText', false, text);
-            this.markDocumentModified();
+        // Handle paste events (textarea handles this natively, but we still want to mark as modified)
+        this.fullTextEl.addEventListener('paste', () => {
+            // Mark as modified after paste completes
+            setTimeout(() => this.markDocumentModified(), 0);
         });
     }
     
@@ -926,27 +916,37 @@ class SelfLoomApp {
          // Auto-save during generation
          let nameToSave = this.currentDocumentName;
          
-         // If still "Untitled", create a temporary name with timestamp
+         // If still "Untitled", create a temporary name with timestamp only once
          if (nameToSave === 'Untitled') {
-             const now = new Date();
-             const timestamp = now.toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
-             nameToSave = `Untitled_${timestamp}`;
+             // Only create timestamp name if we don't already have one
+             if (!this.temporaryDocumentName) {
+                 const now = new Date();
+                 const timestamp = now.toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+                 this.temporaryDocumentName = `Untitled_${timestamp}`;
+             }
+             nameToSave = this.temporaryDocumentName;
          }
          
          try {
-             // Convert <br> tags back to newlines for saving
-             const content = this.convertHtmlToText(this.fullTextEl.innerHTML);
-             const response = await fetch('/api/documents/save', {
+             // Get textarea content directly (already plain text with newlines)
+             const content = this.fullTextEl.value;
+              const response = await fetch('/api/documents/save', {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({ name: nameToSave, content })
              });
              
              if (response.ok) {
+                  const result = await response.json();
+                  const savedName = result.name || nameToSave;
                  // Update current document name if it was "Untitled"
-                 if (this.currentDocumentName === 'Untitled') {
-                     this.currentDocumentName = nameToSave;
+                  if (this.currentDocumentName === 'Untitled' || this.currentDocumentName !== savedName) {
+                      this.currentDocumentName = savedName;
                      this.updateDocumentName();
+                     // Clear temporary name once we have a real name
+                     if (savedName !== this.temporaryDocumentName) {
+                         this.temporaryDocumentName = null;
+                     }
                  }
                  this.documentModified = false;
                  this.updateDocumentName();
@@ -954,7 +954,7 @@ class SelfLoomApp {
                  // Refresh document list to show the saved document
                  this.loadDocumentList();
                  
-                 console.log(`Auto-saved document as "${nameToSave}"`);
+                  console.log(`Auto-saved document as "${savedName}"`);
              } else {
                  console.error('Auto-save failed');
              }
@@ -1113,7 +1113,8 @@ class SelfLoomApp {
              
              if (isDesktop && sidebar) {
                  // On desktop, restore sidebar state from localStorage
-                 const isVisible = localStorage.getItem('sidebarVisible') === 'true';
+                 const savedState = localStorage.getItem('selfloom_sidebar_open');
+                 const isVisible = savedState !== null ? JSON.parse(savedState) : false;
                  const leftPanel = document.getElementById('leftPanel');
                  
                  if (isVisible) {
