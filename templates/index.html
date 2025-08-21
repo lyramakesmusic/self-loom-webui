@@ -772,6 +772,29 @@
             opacity: 0.6;
         }
 
+        /* Autosave Toast (match reference style) */
+        .autosave-toast {
+            position: fixed;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%) translateY(20px);
+            background-color: #198754; /* success green as in reference */
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1070;
+            opacity: 0;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            font-weight: 500;
+            pointer-events: none;
+        }
+
+        .autosave-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
         /* Custom Accordion styling (no Bootstrap) */
         .accordion {
             background-color: transparent;
@@ -1223,6 +1246,12 @@
                             <div class="accordion-body">
                                 <div class="settings-form">
                                     <div class="mb-4">
+                                        <label for="openrouter-api-key" class="form-label">OpenRouter API Key</label>
+                                        <input type="password" class="form-control" id="openrouter-api-key" placeholder="sk-or-v1-..." autocomplete="current-password">
+                                        <div class="form-text" style="font-size: 11px; color: var(--text-secondary); margin-top: 5px;">Your API key is stored securely and only sent to OpenRouter</div>
+                                    </div>
+                                    
+                                    <div class="mb-4">
                                         <label for="base-model" class="form-label">Base Model</label>
                                         <input type="text" class="form-control" id="base-model" value="z-ai/glm-4.5-air:free" placeholder="Base model name">
                                         <!-- <div class="form-text">Model for text generation</div> -->
@@ -1309,6 +1338,11 @@
 
     <!-- Sidebar backdrop for mobile -->
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <!-- Autosave Toast -->
+    <div id="autosaveToast" class="autosave-toast" aria-live="polite" aria-atomic="true">
+        ✓ Autosaved
+    </div>
 
     <script src="/static/js/app.js"></script>
 </body>

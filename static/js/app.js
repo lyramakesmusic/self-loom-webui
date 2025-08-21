@@ -7,7 +7,8 @@ class SelfLoomApp {
         this.eventSource = null;
         this.isGenerating = false;
         this.currentIteration = 0;
-        this.completions = {}; 
+        this.completions = {};
+        this.consecutiveEmptyCount = 0; // Track consecutive iterations with all empty completions
         
         this.statusEl = document.getElementById('status');
         this.fullTextEl = document.getElementById('fullText');
@@ -38,6 +39,18 @@ class SelfLoomApp {
         if (tokenForm) {
             tokenForm.addEventListener('submit', (e) => this.handleTokenSubmit(e));
         }
+
+        // Intercept Ctrl+S / Cmd+S to auto-save and show toast
+        document.addEventListener('keydown', async (e) => {
+            const isCtrlS = (e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey);
+            if (!isCtrlS) return;
+            e.preventDefault();
+            try {
+                await this.autoSaveDocument();
+            } finally {
+                this.showAutosaveToast();
+            }
+        });
     }
     
     toggleGeneration() {
@@ -48,11 +61,22 @@ class SelfLoomApp {
         }
     }
     
+    showAutosaveToast() {
+        const toastEl = document.getElementById('autosaveToast');
+        if (!toastEl) return;
+        toastEl.classList.add('show');
+        clearTimeout(this._autosaveToastTimer);
+        this._autosaveToastTimer = setTimeout(() => {
+            toastEl.classList.remove('show');
+        }, 1200);
+    }
+
     startGeneration() {
         if (this.isGenerating) return;
         
         console.log('Starting text generation');
         this.isGenerating = true;
+        this.consecutiveEmptyCount = 0; // Reset counter when starting new generation
         this.updateGenerationButton();
         this.toggleSettingsInputs(false); // Disable settings inputs
         
@@ -116,6 +140,7 @@ class SelfLoomApp {
         
         this.currentIteration = 0;
         this.completions = {};
+        this.consecutiveEmptyCount = 0; // Reset counter when stopping
         this.updateIterationInfo('Iteration: Stopped');
         this.updateStatus('Stopped');
         
@@ -268,6 +293,27 @@ class SelfLoomApp {
         this.completions[index] = data.text;
         
         this.updateStatus(`Completion ${index}/5 finished`);
+        
+        // Check if all 5 completions are done and if they're all empty
+        if (Object.keys(this.completions).length === 5) {
+            const allEmpty = Object.values(this.completions).every(text => !text || text.trim() === '');
+            if (allEmpty) {
+                this.consecutiveEmptyCount++;
+                console.log(`All completions are empty, consecutive empty count: ${this.consecutiveEmptyCount}/3`);
+                
+                if (this.consecutiveEmptyCount >= 3) {
+                    console.log('3 consecutive empty completion sets detected, stopping generation');
+                    this.updateStatus('No meaningful content generated for 3 iterations - stopping generation');
+                    setTimeout(() => this.stopGeneration(), 2000); // Longer delay to show the message
+                    return;
+                } else {
+                    this.updateStatus(`All completions empty (${this.consecutiveEmptyCount}/3) - continuing...`);
+                }
+            } else {
+                // Reset counter if we got at least one non-empty completion
+                this.consecutiveEmptyCount = 0;
+            }
+        }
         
         // Auto-save after every completion
         this.autoSaveDocument();
@@ -992,24 +1038,35 @@ class SelfLoomApp {
              });
          }
          
-         // Load saved models
-         this.loadSavedModels();
-         
-         // Add event listeners to save models when changed
-         const baseModelInput = document.getElementById('base-model');
-         const graderModelInput = document.getElementById('grader-model');
-         
-         if (baseModelInput) {
-             baseModelInput.addEventListener('change', () => {
-                 this.saveModels();
-             });
-         }
-         
-         if (graderModelInput) {
-             graderModelInput.addEventListener('change', () => {
-                 this.saveModels();
-             });
-         }
+                 // Load saved models and API key
+        this.loadSavedModels();
+        this.loadApiKeyStatus();
+        
+        // Add event listeners to save models when changed
+        const baseModelInput = document.getElementById('base-model');
+        const graderModelInput = document.getElementById('grader-model');
+        const apiKeyInput = document.getElementById('openrouter-api-key');
+        
+        if (baseModelInput) {
+            baseModelInput.addEventListener('change', () => {
+                this.saveModels();
+            });
+        }
+        
+        if (graderModelInput) {
+            graderModelInput.addEventListener('change', () => {
+                this.saveModels();
+            });
+        }
+        
+        if (apiKeyInput) {
+            apiKeyInput.addEventListener('change', () => {
+                this.saveApiKey();
+            });
+            apiKeyInput.addEventListener('blur', () => {
+                this.saveApiKey();
+            });
+        }
      }
      
      async loadSavedModels() {
@@ -1056,14 +1113,80 @@ class SelfLoomApp {
              if (!response.ok) {
                  console.error('Failed to save models');
              }
-         } catch (error) {
-             console.error('Failed to save models:', error);
-         }
-     }
+                 } catch (error) {
+            console.error('Failed to save models:', error);
+        }
+    }
+
+    async loadApiKeyStatus() {
+        try {
+            const response = await fetch('/api/get_token_status');
+            if (response.ok) {
+                const data = await response.json();
+                const apiKeyInput = document.getElementById('openrouter-api-key');
+                
+                if (apiKeyInput && data.has_token) {
+                    apiKeyInput.placeholder = data.masked_token;
+                    apiKeyInput.value = ''; // Don't show actual key, just placeholder
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load API key status:', error);
+        }
+    }
+
+    async saveApiKey() {
+        try {
+            const apiKeyInput = document.getElementById('openrouter-api-key');
+            const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+            
+            // Only save if there's actually a value entered
+            if (!apiKey) {
+                return;
+            }
+            
+            // Basic validation for OpenRouter API key format
+            if (!apiKey.startsWith('sk-or-v1-')) {
+                this.updateStatus('Invalid API key format. OpenRouter keys start with "sk-or-v1-"');
+                return;
+            }
+            
+            const response = await fetch('/set_token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'token': apiKey
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    console.log('API key saved successfully');
+                    // Clear the input and reload the status to show masked version
+                    apiKeyInput.value = '';
+                    this.loadApiKeyStatus();
+                    this.updateStatus('API key updated successfully');
+                } else {
+                    console.error('Failed to save API key:', data.error);
+                    this.updateStatus('Failed to save API key');
+                }
+            } else {
+                console.error('Failed to save API key: Server error');
+                this.updateStatus('Failed to save API key');
+            }
+        } catch (error) {
+            console.error('Failed to save API key:', error);
+            this.updateStatus('Failed to save API key');
+        }
+    }
 
      toggleSettingsInputs(enabled) {
          const baseModelInput = document.getElementById('base-model');
          const graderModelInput = document.getElementById('grader-model');
+         const apiKeyInput = document.getElementById('openrouter-api-key');
          
          if (baseModelInput) {
              baseModelInput.disabled = !enabled;
@@ -1071,6 +1194,10 @@ class SelfLoomApp {
          
          if (graderModelInput) {
              graderModelInput.disabled = !enabled;
+         }
+         
+         if (apiKeyInput) {
+             apiKeyInput.disabled = !enabled;
          }
      }
 

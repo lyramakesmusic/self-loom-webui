@@ -494,6 +494,20 @@ def set_token():
     else:
         return jsonify({'success': False, 'error': 'Failed to save token'})
 
+@app.route('/api/get_token_status')
+def get_token_status():
+    """Get current API token status (masked for security)"""
+    token = config.get('token', '')
+    if token:
+        # Return masked version for display - show first 8 chars and last 4
+        if len(token) > 12:
+            masked_token = token[:8] + '*' * (len(token) - 12) + token[-4:]
+        else:
+            masked_token = '*' * len(token)
+        return jsonify({'has_token': True, 'masked_token': masked_token})
+    else:
+        return jsonify({'has_token': False, 'masked_token': ''})
+
 @app.route('/api/documents')
 def api_list_documents():
     """API endpoint to list all documents"""
