@@ -41,7 +41,8 @@ DEFAULT_CONFIG = {
     'max_tokens': 128,
     'max_new_tokens': 128,
     'base_context_limit': 8000,
-    'grader_context_limit': 4000
+    'grader_context_limit': 4000,
+    'grader_prompt': 'Which of the following 5 completions of the given text is more interesting? reply with only a single number - 1, 2, 3, 4, 5. Remember, you\'re looking for the most *interesting* one.'
 }
 
 # Ensure directories exist
@@ -228,13 +229,14 @@ def stream_completion(prompt, model=BASE_MODEL, max_tokens=128, temperature=1.0)
     except Exception as e:
         print(f"Stream completion failed: {e}")
 
-def get_grader_choice_with_retry(context, completions, max_retries=10, model=INSTRUCT_MODEL):
+def get_grader_choice_with_retry(context, completions, max_retries=10, model=INSTRUCT_MODEL, grader_prompt=None):
     """
     Ask instruct model to pick best completion with retry logic
     context = truncated text string for context
     completions = list of 5 completion text strings
     max_retries = number of retry attempts
     model = model to use for grading
+    grader_prompt = custom prompt for grading (optional)
     Returns integer index (1-5) of chosen completion
     """
     # Use config token, fallback to environment variable
@@ -251,7 +253,11 @@ def get_grader_choice_with_retry(context, completions, max_retries=10, model=INS
     for i, completion in enumerate(completions, 1):
         options_text += f"{i}. {completion}\n\n"
     
-    prompt = f"{context}\n\n{options_text}\n\nWhich of the following 5 completions of the given text is more interesting? reply with only a single number - 1, 2, 3, 4, 5. Remember, you're looking for the most *interesting* one."
+    # Use custom prompt if provided, otherwise use default
+    if grader_prompt is None:
+        grader_prompt = config.get('grader_prompt', DEFAULT_CONFIG['grader_prompt'])
+    
+    prompt = f"{context}\n\n{options_text}\n\n{grader_prompt}"
     
     payload = {
         "model": model,
@@ -321,15 +327,16 @@ def get_grader_choice_with_retry(context, completions, max_retries=10, model=INS
     print(f"Grader failed after {max_retries} attempts, using random choice: {fallback_choice}")
     return fallback_choice
 
-def get_grader_choice(context, completions, model=INSTRUCT_MODEL):
+def get_grader_choice(context, completions, model=INSTRUCT_MODEL, grader_prompt=None):
     """
     Ask instruct model to pick best completion
     context = truncated text string for context
     completions = list of 5 completion text strings
     model = model to use for grading
+    grader_prompt = custom prompt for grading (optional)
     Returns integer index (1-5) of chosen completion
     """
-    return get_grader_choice_with_retry(context, completions, model=model)
+    return get_grader_choice_with_retry(context, completions, model=model, grader_prompt=grader_prompt)
 
 def truncate_text(text, max_tokens):
     """
@@ -589,11 +596,14 @@ def save_models():
         data = request.get_json()
         base_model = data.get('base_model')
         grader_model = data.get('grader_model')
+        grader_prompt = data.get('grader_prompt')
         
         if base_model:
             config['model'] = base_model
         if grader_model:
             config['instruct_model'] = grader_model
+        if grader_prompt:
+            config['grader_prompt'] = grader_prompt
             
         save_config(config)
         
@@ -608,7 +618,8 @@ def get_models():
     try:
         return jsonify({
             'base_model': config.get('model', BASE_MODEL),
-            'grader_model': config.get('instruct_model', INSTRUCT_MODEL)
+            'grader_model': config.get('instruct_model', INSTRUCT_MODEL),
+            'grader_prompt': config.get('grader_prompt', DEFAULT_CONFIG['grader_prompt'])
         })
     except Exception as e:
         print(f"Failed to get models: {e}")
@@ -631,6 +642,7 @@ def generate():
     min_p = float(request.args.get('min_p', 0.02))
     base_model = request.args.get('base_model', BASE_MODEL)
     grader_model = request.args.get('grader_model', INSTRUCT_MODEL)
+    grader_prompt = request.args.get('grader_prompt', None)
     
     # Save the models for next time
     if base_model != BASE_MODEL or grader_model != INSTRUCT_MODEL:
@@ -665,7 +677,7 @@ def generate():
             yield f"data: {json.dumps({'type': 'grading_start'})}\n\n"
             
             grader_context = truncate_text(full_text, GRADER_CONTEXT_LIMIT)
-            chosen_index = get_grader_choice(grader_context, completions, model=grader_model)
+            chosen_index = get_grader_choice(grader_context, completions, model=grader_model, grader_prompt=grader_prompt)
             
             if chosen_index and 1 <= chosen_index <= len(completions):
                 chosen_text = completions[chosen_index - 1]

@@ -80,6 +80,15 @@
             border-bottom: 1px solid var(--border-color);
             background-color: var(--bg-secondary);
             min-height: 50px;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .sidebar-header h1 {
@@ -118,9 +127,9 @@
         }
 
         .document-list {
-            flex: 1;
             padding: 10px;
-            overflow-y: auto;
+            flex: 1;
+            min-height: 0; /* Allows flex item to shrink */
         }
 
         .document-list h4 {
@@ -799,6 +808,7 @@
         .accordion {
             background-color: transparent;
             margin: 0;
+            flex-shrink: 0; /* Don't shrink when space is limited */
         }
         
         .accordion-item {
@@ -866,7 +876,7 @@
         }
         
         .accordion-collapse:not(.collapsed) {
-            max-height: 500px;
+            max-height: 2000px; /* Large enough for content, allows animation */
         }
         
         .accordion-body {
@@ -924,6 +934,14 @@
                 z-index: 1050;
                 transition: transform 0.3s ease;
                 margin-left: 0;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            /* Smooth scrolling for sidebar content on mobile */
+            .sidebar-content {
+                -webkit-overflow-scrolling: touch;
             }
             
             .document-sidebar.visible {
@@ -1232,9 +1250,10 @@
                 <div class="document-subtitle">Autosaves on edit</div>
             </div>
             
-            <!-- Settings Accordion -->
-            <div>
-                <div class="accordion" id="settingsAccordion">
+            <div class="sidebar-content">
+                <!-- Settings Accordion -->
+                <div style="padding: 10px 10px 0 10px; flex-shrink: 0;">
+                    <div class="accordion" id="settingsAccordion">
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="settingsHeading">
                             <button class="accordion-button collapsed" type="button" onclick="toggleSettingsAccordion()">
@@ -1248,7 +1267,7 @@
                                     <div class="mb-4">
                                         <label for="openrouter-api-key" class="form-label">OpenRouter API Key</label>
                                         <input type="password" class="form-control" id="openrouter-api-key" placeholder="sk-or-v1-..." autocomplete="current-password">
-                                        <div class="form-text" style="font-size: 11px; color: var(--text-secondary); margin-top: 5px;">Your API key is stored securely and only sent to OpenRouter</div>
+
                                     </div>
                                     
                                     <div class="mb-4">
@@ -1286,6 +1305,12 @@
                                         <input type="number" class="form-control" id="max_new_tokens" name="max_new_tokens" min="1" max="2048" value="128" required>
                                         <!-- <div class="form-text">Maximum tokens to generate per completion</div> -->
                                     </div>
+                                    
+                                    <div class="mb-4">
+                                        <label for="grader-prompt" class="form-label">Grader Prompt</label>
+                                        <textarea class="form-control" id="grader-prompt" rows="8" style="font-size: 12px; resize: vertical;">Which of the following 5 completions of the given text is more interesting? reply with only a single number - 1, 2, 3, 4, 5. Remember, you're looking for the most *interesting* one.</textarea>
+                                        <!-- <div class="form-text">Prompt used by grader to select best completion</div> -->
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1293,11 +1318,12 @@
                 </div>
             </div>
             
-            <div class="document-list">
-                <h4>Recent Documents</h4>
-                <div id="documentItems">
-                    <div class="document-item">
-                        <span>No documents found</span>
+                <div class="document-list">
+                    <h4>Recent Documents</h4>
+                    <div id="documentItems">
+                        <div class="document-item">
+                            <span>No documents found</span>
+                        </div>
                     </div>
                 </div>
             </div>

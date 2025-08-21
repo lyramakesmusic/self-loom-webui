@@ -93,6 +93,7 @@ class SelfLoomApp {
         const minP = document.getElementById('min_p').value;
         const baseModel = document.getElementById('base-model').value;
         const graderModel = document.getElementById('grader-model').value;
+        const graderPrompt = document.getElementById('grader-prompt').value;
         
         // Save the models for next time
         this.saveModels();
@@ -104,7 +105,8 @@ class SelfLoomApp {
             temperature: temperature,
             min_p: minP,
             base_model: baseModel,
-            grader_model: graderModel
+            grader_model: graderModel,
+            grader_prompt: graderPrompt
         });
         this.eventSource = new EventSource(`/generate?${params.toString()}`);
         
@@ -779,6 +781,7 @@ class SelfLoomApp {
         menu.className = 'document-menu';
         menu.innerHTML = `
             <div class="menu-item" onclick="window.selfLoomApp.showRenameModal('${docName}')">Rename</div>
+            <div class="menu-item" onclick="window.selfLoomApp.downloadDocument('${docName}')">Download as .txt</div>
             <div class="menu-item delete" onclick="window.selfLoomApp.deleteDocument('${docName}')">Delete</div>
         `;
         
@@ -955,10 +958,44 @@ class SelfLoomApp {
                  sidebar.classList.add('visible');
                  leftPanel.classList.add('sidebar-open');
              }
-         }
-     }
-     
-     async autoSaveDocument() {
+                 }
+    }
+    
+    async downloadDocument(docName) {
+        try {
+            const response = await fetch(`/api/documents/load/${encodeURIComponent(docName)}`);
+            if (response.ok) {
+                const data = await response.json();
+                const content = data.content || '';
+                
+                // Create a blob with the text content
+                const blob = new Blob([content], { type: 'text/plain' });
+                
+                // Create a download link
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${docName}.txt`;
+                
+                // Trigger download
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                // Clean up
+                URL.revokeObjectURL(url);
+                
+                this.updateStatus(`Downloaded "${docName}.txt"`);
+            } else {
+                this.updateStatus('Failed to download document');
+            }
+        } catch (error) {
+            console.error('Download failed:', error);
+            this.updateStatus('Failed to download document');
+        }
+    }
+    
+    async autoSaveDocument() {
          // Auto-save during generation
          let nameToSave = this.currentDocumentName;
          
@@ -1067,6 +1104,17 @@ class SelfLoomApp {
                 this.saveApiKey();
             });
         }
+        
+        // Add grader prompt autosave
+        const graderPromptInput = document.getElementById('grader-prompt');
+        if (graderPromptInput) {
+            graderPromptInput.addEventListener('change', () => {
+                this.saveModels();
+            });
+            graderPromptInput.addEventListener('blur', () => {
+                this.saveModels();
+            });
+        }
      }
      
      async loadSavedModels() {
@@ -1077,6 +1125,7 @@ class SelfLoomApp {
                  
                  const baseModelInput = document.getElementById('base-model');
                  const graderModelInput = document.getElementById('grader-model');
+                 const graderPromptInput = document.getElementById('grader-prompt');
                  
                  if (baseModelInput && models.base_model) {
                      baseModelInput.value = models.base_model;
@@ -1084,6 +1133,10 @@ class SelfLoomApp {
                  
                  if (graderModelInput && models.grader_model) {
                      graderModelInput.value = models.grader_model;
+                 }
+                 
+                 if (graderPromptInput && models.grader_prompt) {
+                     graderPromptInput.value = models.grader_prompt;
                  }
              }
          } catch (error) {
@@ -1095,9 +1148,11 @@ class SelfLoomApp {
          try {
              const baseModelInput = document.getElementById('base-model');
              const graderModelInput = document.getElementById('grader-model');
+             const graderPromptInput = document.getElementById('grader-prompt');
              
              const baseModel = baseModelInput ? baseModelInput.value : '';
              const graderModel = graderModelInput ? graderModelInput.value : '';
+             const graderPrompt = graderPromptInput ? graderPromptInput.value : '';
              
              const response = await fetch('/api/save_models', {
                  method: 'POST',
@@ -1106,7 +1161,8 @@ class SelfLoomApp {
                  },
                  body: JSON.stringify({
                      base_model: baseModel,
-                     grader_model: graderModel
+                     grader_model: graderModel,
+                     grader_prompt: graderPrompt
                  })
              });
              
